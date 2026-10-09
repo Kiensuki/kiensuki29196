@@ -1,0 +1,890 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>List NG Pending Pro - Quản lý lỗi chất lượng</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        brand: { 50: '#eef2ff', 500: '#6366f1', 600: '#4f46e5', 700: '#4338ca' }
+                    }
+                }
+            }
+        }
+    </script>
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- SheetJS (xlsx) cho tính năng Import/Export Excel -->
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+        body { font-family: 'Inter', sans-serif; }
+        @media print {
+            body * { visibility: hidden; }
+            #printModalContent, #printModalContent * { visibility: visible; }
+            #printModalContent { position: absolute; left: 0; top: 0; width: 100%; }
+        }
+    </style>
+</head>
+<body class="bg-gray-50 text-gray-800 dark:bg-gray-900 dark:text-gray-100 min-h-screen transition-colors duration-200">
+
+    <!-- HEADER / NAVIGATION -->
+    <header class="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 sticky top-0 z-30 shadow-sm">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+            <div class="flex items-center space-x-3">
+                <div class="bg-red-600 text-white p-2 rounded-lg shadow-md flex items-center justify-center">
+                    <i class="fa-solid fa-triangle-exclamation text-xl"></i>
+                </div>
+                <div>
+                    <h1 class="text-xl font-bold tracking-wide flex items-center gap-2">
+                        List NG Pending <span class="text-xs font-semibold px-2 py-0.5 rounded-full bg-purple-100 text-purple-600 dark:bg-purple-900/40 dark:text-purple-400">PRO v2.1</span>
+                    </h1>
+                    <p class="text-xs text-gray-500 dark:text-gray-400">Hệ thống quản lý lỗi & Đa hình ảnh minh chứng</p>
+                </div>
+            </div>
+
+            <!-- Actions -->
+            <div class="flex items-center space-x-2 sm:space-x-3">
+                <div class="hidden lg:flex items-center space-x-2 text-sm bg-gray-100 dark:bg-gray-700/60 px-3 py-1.5 rounded-lg border border-gray-200 dark:border-gray-600">
+                    <i class="fa-regular fa-clock text-indigo-500"></i>
+                    <span id="realtimeClock" class="font-medium">--:--:-- --/--/----</span>
+                </div>
+
+                <!-- Dark Mode Toggle -->
+                <button onclick="toggleDarkMode()" class="p-2 rounded-lg bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600 transition text-gray-600 dark:text-gray-300" title="Chuyển đổi Sáng/Tối">
+                    <i id="themeIcon" class="fa-solid fa-moon"></i>
+                </button>
+
+                <!-- Hidden file input for Excel import -->
+                <input type="file" id="excelFileInput" accept=".xlsx, .xls, .csv" onchange="handleExcelImport(event)" class="hidden">
+
+                <!-- Import Excel Button -->
+                <button onclick="document.getElementById('excelFileInput').click()" class="flex items-center space-x-1.5 bg-teal-600 hover:bg-teal-700 text-white px-3 py-2 rounded-lg text-sm font-medium shadow transition" title="Nhập dữ liệu hàng loạt từ file Excel">
+                    <i class="fa-solid fa-file-import"></i>
+                    <span class="hidden md:inline">Import Excel</span>
+                </button>
+
+                <!-- Export HTML Report with Images -->
+                <button onclick="exportHTMLReport()" class="flex items-center space-x-1.5 bg-purple-600 hover:bg-purple-700 text-white px-3 py-2 rounded-lg text-sm font-medium shadow transition" title="Xuất báo cáo HTML kèm đầy đủ hình ảnh">
+                    <i class="fa-solid fa-file-code"></i>
+                    <span class="hidden md:inline">Báo Cáo Ảnh</span>
+                </button>
+
+                <!-- Export Excel -->
+                <button onclick="exportToExcel()" class="flex items-center space-x-1.5 bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-2 rounded-lg text-sm font-medium shadow transition">
+                    <i class="fa-solid fa-file-excel"></i>
+                    <span class="hidden md:inline">Xuất Excel</span>
+                </button>
+
+                <!-- Add New Button -->
+                <button onclick="openModal()" class="flex items-center space-x-1.5 bg-indigo-600 hover:bg-indigo-700 text-white px-3.5 py-2 rounded-lg text-sm font-medium shadow-md transition">
+                    <i class="fa-solid fa-plus"></i>
+                    <span>Thêm Mới</span>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- MAIN CONTAINER -->
+    <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
+
+        <!-- DASHBOARD CARDS -->
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            <div class="bg-white dark:bg-gray-800 p-4 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 flex items-center justify-between">
+                <div>
+                    <p class="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Tổng Lô Lỗi (NG)</p>
+                    <h3 id="statTotal" class="text-2xl font-bold text-gray-900 dark:text-white mt-1">0</h3>
+                </div>
+                <div class="w-12 h-12 bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 rounded-xl flex items-center justify-center text-xl">
+                    <i class="fa-solid fa-boxes-stacked"></i>
+                </div>
+            </div>
+
+            <div class="bg-white dark:bg-gray-800 p-4 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 flex items-center justify-between">
+                <div>
+                    <p class="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Chưa Xử Lý</p>
+                    <h3 id="statPending" class="text-2xl font-bold text-red-600 dark:text-red-400 mt-1">0</h3>
+                </div>
+                <div class="w-12 h-12 bg-red-50 dark:bg-red-900/30 text-red-600 dark:text-red-400 rounded-xl flex items-center justify-center text-xl animate-pulse">
+                    <i class="fa-solid fa-circle-exclamation"></i>
+                </div>
+            </div>
+
+            <div class="bg-white dark:bg-gray-800 p-4 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 flex items-center justify-between">
+                <div>
+                    <p class="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Đang Xử Lý</p>
+                    <h3 id="statProcessing" class="text-2xl font-bold text-amber-600 dark:text-amber-400 mt-1">0</h3>
+                </div>
+                <div class="w-12 h-12 bg-amber-50 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400 rounded-xl flex items-center justify-center text-xl">
+                    <i class="fa-solid fa-spinner"></i>
+                </div>
+            </div>
+
+            <div class="bg-white dark:bg-gray-800 p-4 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 flex items-center justify-between">
+                <div>
+                    <p class="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Đã Xử Lý / Hoàn Tất</p>
+                    <h3 id="statResolved" class="text-2xl font-bold text-emerald-600 dark:text-emerald-400 mt-1">0</h3>
+                </div>
+                <div class="w-12 h-12 bg-emerald-50 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400 rounded-xl flex items-center justify-center text-xl">
+                    <i class="fa-solid fa-circle-check"></i>
+                </div>
+            </div>
+        </div>
+
+        <!-- CHARTS SECTION -->
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <div class="lg:col-span-2 bg-white dark:bg-gray-800 p-5 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700">
+                <h3 class="text-base font-bold mb-4 flex items-center gap-2">
+                    <i class="fa-solid fa-chart-bar text-indigo-500"></i> Phân cấp số lượng NG theo Nhà Cung Cấp
+                </h3>
+                <div class="relative h-64">
+                    <canvas id="supplierChart"></canvas>
+                </div>
+            </div>
+            <div class="bg-white dark:bg-gray-800 p-5 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700">
+                <h3 class="text-base font-bold mb-4 flex items-center gap-2">
+                    <i class="fa-solid fa-chart-pie text-indigo-500"></i> Tỷ lệ Hiện Trạng Xử Lý
+                </h3>
+                <div class="relative h-64 flex items-center justify-center">
+                    <canvas id="statusChart"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <!-- FILTERS BAR -->
+        <div class="bg-white dark:bg-gray-800 p-4 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 flex flex-wrap items-center justify-between gap-4">
+            <div class="flex flex-wrap items-center gap-3 flex-1">
+                <div class="relative min-w-[240px] flex-1">
+                    <span class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-gray-400">
+                        <i class="fa-solid fa-magnifying-glass"></i>
+                    </span>
+                    <input type="text" id="searchInput" oninput="renderTable()" placeholder="Tìm kiếm mã hàng, NCC, lỗi, người xác nhận..." 
+                           class="w-full pl-10 pr-4 py-2 bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                </div>
+
+                <select id="filterStatus" onchange="renderTable()" class="py-2 px-3 bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                    <option value="">Tất cả hiện trạng</option>
+                    <option value="Chưa xử lý">Chưa xử lý</option>
+                    <option value="Đang xử lý">Đang xử lý</option>
+                    <option value="Đã xử lý">Đã xử lý</option>
+                    <option value="Đã trả hàng">Đã trả hàng</option>
+                </select>
+
+                <div class="flex items-center space-x-2 text-sm text-gray-500 dark:text-gray-400">
+                    <span>Từ:</span>
+                    <input type="date" id="filterDateFrom" onchange="renderTable()" class="py-1.5 px-3 bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg text-sm">
+                </div>
+
+                <div class="flex items-center space-x-2 text-sm text-gray-500 dark:text-gray-400">
+                    <span>Đến:</span>
+                    <input type="date" id="filterDateTo" onchange="renderTable()" class="py-1.5 px-3 bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg text-sm">
+                </div>
+            </div>
+
+            <div class="flex items-center space-x-3">
+                <button onclick="downloadTemplateExcel()" class="text-sm text-teal-600 dark:text-teal-400 hover:underline font-medium flex items-center gap-1" title="Tải file Excel mẫu để điền dữ liệu nhập">
+                    <i class="fa-solid fa-download"></i> Tải file mẫu
+                </button>
+                <button onclick="resetFilters()" class="text-sm text-indigo-600 dark:text-indigo-400 hover:underline font-medium flex items-center gap-1">
+                    <i class="fa-solid fa-rotate-right"></i> Đặt lại bộ lọc
+                </button>
+            </div>
+        </div>
+
+        <!-- MAIN DATA TABLE -->
+        <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
+            <div class="overflow-x-auto">
+                <table class="w-full text-left border-collapse">
+                    <thead>
+                        <tr class="bg-gray-100/70 dark:bg-gray-700/50 text-xs uppercase font-semibold text-gray-600 dark:text-gray-300 border-b border-gray-200 dark:border-gray-700">
+                            <th class="p-3 text-center w-12">STT</th>
+                            <th class="p-3">Mã hàng</th>
+                            <th class="p-3">Loại hàng</th>
+                            <th class="p-3">Nhà cung cấp</th>
+                            <th class="p-3 text-center">Ngày</th>
+                            <th class="p-3 text-right">SL NG</th>
+                            <th class="p-3">Lỗi gặp phải (NG)</th>
+                            <th class="p-3">Hiện trạng xử lý</th>
+                            <th class="p-3">Người XN / Fail</th>
+                            <th class="p-3">Ghi chú</th>
+                            <th class="p-3 text-center">Hình ảnh</th>
+                            <th class="p-3 text-center w-28">Thao tác</th>
+                        </tr>
+                    </thead>
+                    <tbody id="tableBody" class="divide-y divide-gray-200 dark:divide-gray-700 text-sm">
+                        <!-- Dynamic rendered rows -->
+                    </tbody>
+                </table>
+            </div>
+            <div id="emptyState" class="hidden p-12 text-center">
+                <div class="text-gray-400 text-4xl mb-3"><i class="fa-solid fa-folder-open"></i></div>
+                <p class="text-gray-500 dark:text-gray-400 font-medium">Không tìm thấy bản ghi lỗi nào phù hợp!</p>
+            </div>
+        </div>
+    </main>
+
+    <!-- MODAL ADD / EDIT -->
+    <div id="recordModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm hidden">
+        <div class="bg-white dark:bg-gray-800 rounded-xl shadow-xl w-full max-w-2xl mx-4 overflow-hidden border border-gray-200 dark:border-gray-700 max-h-[90vh] flex flex-col">
+            <div class="px-6 py-4 border-b border-gray-200 dark:border-gray-700 flex justify-between items-center bg-gray-50 dark:bg-gray-700/50">
+                <h3 id="modalTitle" class="text-lg font-bold text-gray-900 dark:text-white">Thêm Mới Bản Ghi NG</h3>
+                <button onclick="closeModal()" class="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200"><i class="fa-solid fa-xmark text-lg"></i></button>
+            </div>
+            
+            <form id="ngForm" onsubmit="saveRecord(event)" class="p-6 space-y-4 overflow-y-auto flex-1">
+                <input type="hidden" id="recordId">
+
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-xs font-semibold uppercase text-gray-600 dark:text-gray-400 mb-1">Mã hàng *</label>
+                        <input type="text" id="itemCode" required class="w-full px-3 py-2 bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold uppercase text-gray-600 dark:text-gray-400 mb-1">Loại hàng *</label>
+                        <input type="text" id="itemType" required class="w-full px-3 py-2 bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500">
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                    <div>
+                        <label class="block text-xs font-semibold uppercase text-gray-600 dark:text-gray-400 mb-1">Nhà cung cấp *</label>
+                        <input type="text" id="supplier" required class="w-full px-3 py-2 bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold uppercase text-gray-600 dark:text-gray-400 mb-1">Ngày phát sinh *</label>
+                        <input type="date" id="ngDate" required class="w-full px-3 py-2 bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold uppercase text-gray-600 dark:text-gray-400 mb-1">Số lượng NG *</label>
+                        <input type="number" id="ngQuantity" min="1" required class="w-full px-3 py-2 bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500">
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-xs font-semibold uppercase text-gray-600 dark:text-gray-400 mb-1">Lỗi gặp phải *</label>
+                        <input type="text" id="ngError" placeholder="VD: Xước bề mặt, sai kích thước..." required class="w-full px-3 py-2 bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold uppercase text-gray-600 dark:text-gray-400 mb-1">Hiện trạng xử lý *</label>
+                        <select id="ngStatus" required class="w-full px-3 py-2 bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500">
+                            <option value="Chưa xử lý">Chưa xử lý</option>
+                            <option value="Đang xử lý">Đang xử lý</option>
+                            <option value="Đã xử lý">Đã xử lý</option>
+                            <option value="Đã trả hàng">Đã trả hàng</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-xs font-semibold uppercase text-gray-600 dark:text-gray-400 mb-1">Người xác nhận / Fail</label>
+                        <input type="text" id="confirmer" class="w-full px-3 py-2 bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold uppercase text-gray-600 dark:text-gray-400 mb-1">Ghi chú</label>
+                        <input type="text" id="note" class="w-full px-3 py-2 bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500">
+                    </div>
+                </div>
+
+                <!-- MULTI-IMAGE PASTE / UPLOAD ZONE -->
+                <div>
+                    <label class="block text-xs font-semibold uppercase text-gray-600 dark:text-gray-400 mb-1">Hình ảnh minh chứng (Hỗ trợ dán nhiều ảnh Ctrl+V hoặc chọn tệp)</label>
+                    <div id="pasteDropZone" tabindex="0" onclick="document.getElementById('imageFiles').click()" 
+                         class="border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-xl p-4 text-center cursor-pointer hover:border-indigo-500 dark:hover:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-gray-50 dark:bg-gray-700/30 transition outline-none">
+                        
+                        <div id="imagePreviewGrid" class="grid grid-cols-3 sm:grid-cols-4 gap-2 mb-2 hidden"></div>
+
+                        <div id="imagePlaceholder" class="space-y-1 pointer-events-none">
+                            <i class="fa-solid fa-cloud-arrow-up text-2xl text-gray-400"></i>
+                            <p class="text-sm text-gray-600 dark:text-gray-300 font-medium">Click vào đây và nhấn <span class="text-indigo-600 dark:text-indigo-400 font-bold">Ctrl + V</span> (dán nhiều ảnh)</p>
+                            <p class="text-xs text-gray-400">Hoặc bấm chọn nhiều tệp từ máy tính</p>
+                        </div>
+                        <input type="file" id="imageFiles" accept="image/*" multiple onchange="handleFileSelect(event)" class="hidden">
+                    </div>
+                </div>
+
+                <div class="flex justify-end space-x-3 pt-4 border-t border-gray-200 dark:border-gray-700">
+                    <button type="button" onclick="closeModal()" class="px-4 py-2 bg-gray-200 hover:bg-gray-300 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-200 rounded-lg text-sm font-medium transition">Hủy</button>
+                    <button type="submit" class="px-5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-sm font-medium shadow transition">Lưu bản ghi</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- DETAIL / PRINT MODAL -->
+    <div id="detailModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm hidden">
+        <div class="bg-white dark:bg-gray-800 rounded-xl shadow-xl w-full max-w-3xl mx-4 overflow-hidden border border-gray-200 dark:border-gray-700 max-h-[90vh] flex flex-col">
+            <div class="px-6 py-4 border-b border-gray-200 dark:border-gray-700 flex justify-between items-center bg-gray-50 dark:bg-gray-700/50">
+                <h3 class="text-lg font-bold text-gray-900 dark:text-white"><i class="fa-solid fa-file-lines text-indigo-500"></i> Chi Tiết Biên Bản NG</h3>
+                <button onclick="closeDetailModal()" class="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200"><i class="fa-solid fa-xmark text-lg"></i></button>
+            </div>
+            
+            <div id="printModalContent" class="p-6 space-y-4 overflow-y-auto flex-1 text-sm bg-white dark:bg-gray-800">
+                <div class="text-center border-b pb-4 border-gray-200 dark:border-gray-700">
+                    <h2 class="text-xl font-bold uppercase tracking-wider text-red-600">PHIẾU BÁO CÁO & XỬ LÝ LỖI (NG PENDING)</h2>
+                    <p class="text-xs text-gray-500 mt-1">Hệ thống Quản lý Chất lượng - PRO v2.1</p>
+                </div>
+                
+                <div class="grid grid-cols-2 gap-4 pt-2">
+                    <div><strong class="text-gray-500">Mã hàng:</strong> <span id="dtItemCode" class="font-semibold"></span></div>
+                    <div><strong class="text-gray-500">Loại hàng:</strong> <span id="dtItemType" class="font-semibold"></span></div>
+                    <div><strong class="text-gray-500">Nhà cung cấp:</strong> <span id="dtSupplier" class="font-semibold"></span></div>
+                    <div><strong class="text-gray-500">Ngày phát sinh:</strong> <span id="dtDate" class="font-semibold"></span></div>
+                    <div><strong class="text-gray-500">Số lượng NG:</strong> <span id="dtQuantity" class="font-semibold text-red-600"></span></div>
+                    <div><strong class="text-gray-500">Hiện trạng:</strong> <span id="dtStatus" class="font-semibold"></span></div>
+                    <div class="col-span-2"><strong class="text-gray-500">Lỗi gặp phải:</strong> <span id="dtError" class="font-semibold text-red-600"></span></div>
+                    <div class="col-span-2"><strong class="text-gray-500">Người xác nhận / Fail:</strong> <span id="dtConfirmer"></span></div>
+                    <div class="col-span-2"><strong class="text-gray-500">Ghi chú:</strong> <span id="dtNote"></span></div>
+                </div>
+
+                <div class="pt-4 border-t border-gray-200 dark:border-gray-700">
+                    <p class="font-semibold text-gray-600 dark:text-gray-400 mb-2">Hình ảnh minh chứng thực tế:</p>
+                    <div id="dtImagesWrapper" class="grid grid-cols-2 sm:grid-cols-3 gap-3 bg-gray-100 dark:bg-gray-900 p-3 rounded-lg min-h-[120px]">
+                        <span class="text-gray-400 italic col-span-full text-center">Không có hình ảnh đính kèm</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="px-6 py-3 border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-700/50 flex justify-end space-x-3">
+                <button onclick="window.print()" class="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-sm font-medium shadow transition flex items-center gap-2">
+                    <i class="fa-solid fa-print"></i> In Biên Bản / Tải PDF
+                </button>
+                <button onclick="closeDetailModal()" class="px-4 py-2 bg-gray-300 dark:bg-gray-600 hover:bg-gray-400 text-gray-800 dark:text-gray-200 rounded-lg text-sm font-medium transition">Đóng</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- JAVASCRIPT LOGIC -->
+    <script>
+        let records = JSON.parse(localStorage.getItem('ng_records_pro')) || [
+            { id: 1, itemCode: 'M001', itemType: 'Nhôm tấm A5052', supplier: 'Công ty TNHH Nhôm Việt', ngDate: '2026-06-01', ngQuantity: 15, ngError: 'Xước bề mặt sâu', status: 'Chưa xử lý', confirmer: 'Nguyễn Văn A', note: 'Yêu cầu đổi lô mới', images: [] }
+        ];
+
+        let currentImagesArray = [];
+        let supplierChartInstance = null;
+        let statusChartInstance = null;
+
+        // Realtime Clock
+        setInterval(() => {
+            const now = new Date();
+            document.getElementById('realtimeClock').innerText = now.toLocaleTimeString('vi-VN') + ' ' + now.toLocaleDateString('vi-VN');
+        }, 1000);
+
+        // Dark Mode Toggle
+        function toggleDarkMode() {
+            document.documentElement.classList.toggle('dark');
+            const isDark = document.documentElement.classList.contains('dark');
+            localStorage.setItem('theme', isDark ? 'dark' : 'light');
+            document.getElementById('themeIcon').className = isDark ? 'fa-solid fa-sun' : 'fa-solid fa-moon';
+            updateCharts();
+        }
+
+        if (localStorage.getItem('theme') === 'dark' || (!localStorage.getItem('theme') && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+            document.documentElement.classList.add('dark');
+            document.getElementById('themeIcon').className = 'fa-solid fa-sun';
+        }
+
+        window.addEventListener('DOMContentLoaded', () => {
+            renderTable();
+            initCharts();
+            setupPasteListener();
+        });
+
+        function saveToStorage() {
+            localStorage.setItem('ng_records_pro', JSON.stringify(records));
+        }
+
+        function renderTable() {
+            const keyword = document.getElementById('searchInput').value.toLowerCase();
+            const statusFilter = document.getElementById('filterStatus').value;
+            const dateFrom = document.getElementById('filterDateFrom').value;
+            const dateTo = document.getElementById('filterDateTo').value;
+
+            const tbody = document.getElementById('tableBody');
+            const emptyState = document.getElementById('emptyState');
+            tbody.innerHTML = '';
+
+            let filtered = records.filter(item => {
+                const matchKeyword = (item.itemCode + item.itemType + item.supplier + item.ngError + item.confirmer + item.note).toLowerCase().includes(keyword);
+                const matchStatus = !statusFilter || item.status === statusFilter;
+                const matchDateFrom = !dateFrom || item.ngDate >= dateFrom;
+                const matchDateTo = !dateTo || item.ngDate <= dateTo;
+                return matchKeyword && matchStatus && matchDateFrom && matchDateTo;
+            });
+
+            let total = records.length;
+            let pending = records.filter(i => i.status === 'Chưa xử lý').length;
+            let processing = records.filter(i => i.status === 'Đang xử lý').length;
+            let resolved = records.filter(i => i.status === 'Đã xử lý' || i.status === 'Đã trả hàng').length;
+
+            document.getElementById('statTotal').innerText = total;
+            document.getElementById('statPending').innerText = pending;
+            document.getElementById('statProcessing').innerText = processing;
+            document.getElementById('statResolved').innerText = resolved;
+
+            if (filtered.length === 0) {
+                emptyState.classList.remove('hidden');
+            } else {
+                emptyState.classList.add('hidden');
+                filtered.forEach((item, index) => {
+                    let statusBadge = '';
+                    if(item.status === 'Chưa xử lý') statusBadge = '<span class="px-2.5 py-1 bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-400 rounded-full text-xs font-semibold flex items-center gap-1 w-max"><i class="fa-solid fa-circle-exclamation"></i> Chưa xử lý</span>';
+                    else if(item.status === 'Đang xử lý') statusBadge = '<span class="px-2.5 py-1 bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-400 rounded-full text-xs font-semibold flex items-center gap-1 w-max"><i class="fa-solid fa-spinner"></i> Đang xử lý</span>';
+                    else if(item.status === 'Đã xử lý') statusBadge = '<span class="px-2.5 py-1 bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-400 rounded-full text-xs font-semibold flex items-center gap-1 w-max"><i class="fa-solid fa-circle-check"></i> Đã xử lý</span>';
+                    else statusBadge = '<span class="px-2.5 py-1 bg-purple-100 text-purple-700 dark:bg-purple-900/40 dark:text-purple-400 rounded-full text-xs font-semibold flex items-center gap-1 w-max"><i class="fa-solid fa-rotate-left"></i> Đã trả hàng</span>';
+
+                    let imgCount = (item.images && item.images.length > 0) ? item.images.length : 0;
+                    let imgThumb = imgCount > 0 ? 
+                        `<div onclick="openDetail(${item.id})" class="relative cursor-pointer inline-block group">
+                            <img src="${item.images[0]}" class="h-10 w-10 object-cover rounded-lg shadow border mx-auto">
+                            <span class="absolute -top-2 -right-2 bg-indigo-600 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full shadow">+${imgCount}</span>
+                         </div>` : '<span class="text-gray-400 text-xs">Không có</span>';
+
+                    let tr = document.createElement('tr');
+                    tr.className = "hover:bg-gray-50 dark:hover:bg-gray-700/40 transition border-b border-gray-200 dark:border-gray-700";
+                    tr.innerHTML = `
+                        <td class="p-3 text-center font-medium">${index + 1}</td>
+                        <td class="p-3 font-semibold text-indigo-600 dark:text-indigo-400">${item.itemCode}</td>
+                        <td class="p-3">${item.itemType}</td>
+                        <td class="p-3 font-medium">${item.supplier}</td>
+                        <td class="p-3 text-center text-gray-500">${item.ngDate}</td>
+                        <td class="p-3 text-right font-bold text-red-600">${item.ngQuantity}</td>
+                        <td class="p-3">${item.ngError}</td>
+                        <td class="p-3">${statusBadge}</td>
+                        <td class="p-3">${item.confirmer || '-'}</td>
+                        <td class="p-3 text-gray-500">${item.note || '-'}</td>
+                        <td class="p-3 text-center">${imgThumb}</td>
+                        <td class="p-3 text-center">
+                            <div class="flex items-center justify-center space-x-2">
+                                <button onclick="openDetail(${item.id})" class="p-1.5 bg-blue-50 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400 rounded-lg hover:bg-blue-100 transition" title="Xem chi tiết & In"><i class="fa-solid fa-eye"></i></button>
+                                <button onclick="editRecord(${item.id})" class="p-1.5 bg-amber-50 text-amber-600 dark:bg-amber-900/30 dark:text-amber-400 rounded-lg hover:bg-amber-100 transition" title="Sửa"><i class="fa-solid fa-pen"></i></button>
+                                <button onclick="deleteRecord(${item.id})" class="p-1.5 bg-red-50 text-red-600 dark:bg-red-900/30 dark:text-red-400 rounded-lg hover:bg-red-100 transition" title="Xóa"><i class="fa-solid fa-trash"></i></button>
+                            </div>
+                        </td>
+                    `;
+                    tbody.appendChild(tr);
+                });
+            }
+            updateCharts();
+        }
+
+        function initCharts() {
+            const ctxSupplier = document.getElementById('supplierChart').getContext('2d');
+            const ctxStatus = document.getElementById('statusChart').getContext('2d');
+
+            supplierChartInstance = new Chart(ctxSupplier, {
+                type: 'bar',
+                data: { labels: [], datasets: [{ label: 'Số lượng lỗi (NG)', data: [], backgroundColor: '#6366f1', borderRadius: 6 }] },
+                options: { responsive: true, maintainAspectRatio: false, scales: { y: { beginAtZero: true } } }
+            });
+
+            statusChartInstance = new Chart(ctxStatus, {
+                type: 'doughnut',
+                data: { labels: ['Chưa xử lý', 'Đang xử lý', 'Đã xử lý / Trả hàng'], datasets: [{ data: [0, 0, 0], backgroundColor: ['#ef4444', '#f59e0b', '#10b981'] }] },
+                options: { responsive: true, maintainAspectRatio: false }
+            });
+
+            updateCharts();
+        }
+
+        function updateCharts() {
+            if(!supplierChartInstance || !statusChartInstance) return;
+
+            let supplierCounts = {};
+            records.forEach(r => {
+                supplierCounts[r.supplier] = (supplierCounts[r.supplier] || 0) + parseInt(r.ngQuantity);
+            });
+
+            supplierChartInstance.data.labels = Object.keys(supplierCounts);
+            supplierChartInstance.data.datasets[0].data = Object.values(supplierCounts);
+            supplierChartInstance.update();
+
+            let cPending = records.filter(i => i.status === 'Chưa xử lý').length;
+            let cProcessing = records.filter(i => i.status === 'Đang xử lý').length;
+            let cResolved = records.filter(i => i.status === 'Đã xử lý' || i.status === 'Đã trả hàng').length;
+
+            statusChartInstance.data.datasets[0].data = [cPending, cProcessing, cResolved];
+            statusChartInstance.update();
+        }
+
+        function openModal(id = null) {
+            document.getElementById('recordModal').classList.remove('hidden');
+            document.getElementById('ngForm').reset();
+            document.getElementById('recordId').value = '';
+            currentImagesArray = [];
+            renderImagePreviews();
+
+            if(id) {
+                document.getElementById('modalTitle').innerText = 'Chỉnh Sửa Bản Ghi NG';
+                let item = records.find(r => r.id === id);
+                if(item) {
+                    document.getElementById('recordId').value = item.id;
+                    document.getElementById('itemCode').value = item.itemCode;
+                    document.getElementById('itemType').value = item.itemType;
+                    document.getElementById('supplier').value = item.supplier;
+                    document.getElementById('ngDate').value = item.ngDate;
+                    document.getElementById('ngQuantity').value = item.ngQuantity;
+                    document.getElementById('ngError').value = item.ngError;
+                    document.getElementById('ngStatus').value = item.status;
+                    document.getElementById('confirmer').value = item.confirmer || '';
+                    document.getElementById('note').value = item.note || '';
+                    if(item.images && item.images.length > 0) {
+                        currentImagesArray = [...item.images];
+                        renderImagePreviews();
+                    }
+                }
+            } else {
+                document.getElementById('modalTitle').innerText = 'Thêm Mới Bản Ghi NG';
+                document.getElementById('ngDate').valueAsDate = new Date();
+            }
+        }
+
+        function closeModal() {
+            document.getElementById('recordModal').classList.add('hidden');
+        }
+
+        function openDetail(id) {
+            let item = records.find(r => r.id === id);
+            if(!item) return;
+
+            document.getElementById('dtItemCode').innerText = item.itemCode;
+            document.getElementById('dtItemType').innerText = item.itemType;
+            document.getElementById('dtSupplier').innerText = item.supplier;
+            document.getElementById('dtDate').innerText = item.ngDate;
+            document.getElementById('dtQuantity').innerText = item.ngQuantity;
+            document.getElementById('dtStatus').innerText = item.status;
+            document.getElementById('dtError').innerText = item.ngError;
+            document.getElementById('dtConfirmer').innerText = item.confirmer || '-';
+            document.getElementById('dtNote').innerText = item.note || '-';
+
+            let imgWrapper = document.getElementById('dtImagesWrapper');
+            imgWrapper.innerHTML = '';
+            if(item.images && item.images.length > 0) {
+                item.images.forEach(img => {
+                    let imageNode = document.createElement('div');
+                    imageNode.className = "bg-white dark:bg-gray-800 p-1.5 rounded-lg border border-gray-200 dark:border-gray-700 shadow-sm flex items-center justify-center";
+                    imageNode.innerHTML = `<img src="${img}" class="h-32 w-full object-contain rounded">`;
+                    imgWrapper.appendChild(imageNode);
+                });
+            } else {
+                imgWrapper.innerHTML = `<span class="text-gray-400 italic col-span-full text-center">Không có hình ảnh đính kèm</span>`;
+            }
+
+            document.getElementById('detailModal').classList.remove('hidden');
+        }
+
+        function closeDetailModal() {
+            document.getElementById('detailModal').classList.add('hidden');
+        }
+
+        function saveRecord(e) {
+            e.preventDefault();
+            let id = document.getElementById('recordId').value;
+            let data = {
+                id: id ? parseInt(id) : Date.now(),
+                itemCode: document.getElementById('itemCode').value,
+                itemType: document.getElementById('itemType').value,
+                supplier: document.getElementById('supplier').value,
+                ngDate: document.getElementById('ngDate').value,
+                ngQuantity: parseInt(document.getElementById('ngQuantity').value),
+                ngError: document.getElementById('ngError').value,
+                status: document.getElementById('ngStatus').value,
+                confirmer: document.getElementById('confirmer').value,
+                note: document.getElementById('note').value,
+                images: [...currentImagesArray]
+            };
+
+            if(id) {
+                let index = records.findIndex(r => r.id === parseInt(id));
+                if(index !== -1) records[index] = data;
+            } else {
+                records.unshift(data);
+            }
+
+            saveToStorage();
+            renderTable();
+            closeModal();
+        }
+
+        function editRecord(id) {
+            openModal(id);
+        }
+
+        function deleteRecord(id) {
+            if(confirm('Bạn có chắc chắn muốn xóa bản ghi lỗi này không?')) {
+                records = records.filter(r => r.id !== id);
+                saveToStorage();
+                renderTable();
+            }
+        }
+
+        function setupPasteListener() {
+            const dropZone = document.getElementById('pasteDropZone');
+            dropZone.addEventListener('paste', (e) => {
+                let items = (e.clipboardData || e.originalEvent.clipboardData).items;
+                for (let item of items) {
+                    if (item.type.indexOf('image') === 0) {
+                        let blob = item.getAsFile();
+                        let reader = new FileReader();
+                        reader.onload = function(event) {
+                            currentImagesArray.push(event.target.result);
+                            renderImagePreviews();
+                        };
+                        reader.readAsDataURL(blob);
+                        e.preventDefault();
+                    }
+                }
+            });
+        }
+
+        function handleFileSelect(event) {
+            let files = event.target.files;
+            if(files && files.length > 0) {
+                for(let file of files) {
+                    let reader = new FileReader();
+                    reader.onload = function(e) {
+                        currentImagesArray.push(e.target.result);
+                        renderImagePreviews();
+                    };
+                    reader.readAsDataURL(file);
+                }
+            }
+        }
+
+        function removeImageItem(index, event) {
+            if(event) event.stopPropagation();
+            currentImagesArray.splice(index, 1);
+            renderImagePreviews();
+        }
+
+        function renderImagePreviews() {
+            const grid = document.getElementById('imagePreviewGrid');
+            const placeholder = document.getElementById('imagePlaceholder');
+            grid.innerHTML = '';
+
+            if(currentImagesArray.length > 0) {
+                grid.classList.remove('hidden');
+                placeholder.classList.add('hidden');
+                currentImagesArray.forEach((imgSrc, idx) => {
+                    let div = document.createElement('div');
+                    div.className = "relative group bg-white dark:bg-gray-800 p-1 rounded-lg border border-gray-300 dark:border-gray-600 shadow-sm";
+                    div.innerHTML = `
+                        <img src="${imgSrc}" class="h-20 w-full object-cover rounded">
+                        <button type="button" onclick="removeImageItem(${idx}, event)" class="absolute top-1 right-1 bg-red-600 text-white rounded-full w-6 h-6 flex items-center justify-center text-xs shadow hover:bg-red-700 transition" title="Xóa ảnh này">
+                            <i class="fa-solid fa-xmark"></i>
+                        </button>
+                    `;
+                    grid.appendChild(div);
+                });
+            } else {
+                grid.classList.add('hidden');
+                placeholder.classList.remove('hidden');
+                document.getElementById('imageFiles').value = '';
+            }
+        }
+
+        function resetFilters() {
+            document.getElementById('searchInput').value = '';
+            document.getElementById('filterStatus').value = '';
+            document.getElementById('filterDateFrom').value = '';
+            document.getElementById('filterDateTo').value = '';
+            renderTable();
+        }
+
+        // Tải file mẫu Excel chuẩn để điền dữ liệu
+        function downloadTemplateExcel() {
+            let templateData = [{
+                'Mã hàng': 'M00X',
+                'Loại hàng': 'Tên sản phẩm mẫu',
+                'Nhà cung cấp': 'Tên công ty cung cấp',
+                'Ngày phát sinh': '2026-06-06',
+                'Số lượng NG': 10,
+                'Lỗi gặp phải': 'Mô tả lỗi sản phẩm',
+                'Hiện trạng': 'Chưa xử lý',
+                'Người xác nhận': 'Tên nhân viên QC',
+                'Ghi chú': 'Ghi chú thêm nếu có'
+            }];
+            let worksheet = XLSX.utils.json_to_sheet(templateData);
+            let workbook = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(workbook, worksheet, "Template NG");
+            XLSX.writeFile(workbook, "Template_Import_NG.xlsx");
+        }
+
+        // Xử lý file Excel Import vào phần mềm
+        function handleExcelImport(event) {
+            let file = event.target.files[0];
+            if(!file) return;
+
+            let reader = new FileReader();
+            reader.onload = function(e) {
+                try {
+                    let data = new Uint8Array(e.target.result);
+                    let workbook = XLSX.read(data, {type: 'array'});
+                    let firstSheetName = workbook.SheetNames[0];
+                    let worksheet = workbook.Sheets[firstSheetName];
+                    let jsonRows = XLSX.utils.sheet_to_json(worksheet);
+
+                    if(jsonRows.length === 0) {
+                        alert('File Excel trống hoặc không có dữ liệu!');
+                        return;
+                    }
+
+                    let addedCount = 0;
+                    jsonRows.forEach(row => {
+                        // Mapping các tên cột linh hoạt từ tiếng Việt trong Excel
+                        let itemCode = row['Mã hàng'] || row['Ma hang'] || row['Mã Hàng'] || 'N/A';
+                        let itemType = row['Loại hàng'] || row['Loai hang'] || 'Khác';
+                        let supplier = row['Nhà cung cấp'] || row['Nha cung cap'] || 'Chưa rõ';
+                        let ngDate = row['Ngày phát sinh'] || row['Ngay phat sinh'] || new Date().toISOString().slice(0,10);
+                        let ngQuantity = parseInt(row['Số lượng NG'] || row['So luong NG'] || row['SL NG'] || 1);
+                        let ngError = row['Lỗi gặp phải'] || row['Loi gap phai'] || row['Lỗi'] || 'Lỗi phát sinh';
+                        let status = row['Hiện trạng'] || row['Hien trang'] || 'Chưa xử lý';
+                        let confirmer = row['Người xác nhận'] || row['Nguoi xac nhan'] || '';
+                        let note = row['Ghi chú'] || row['Ghi chu'] || '';
+
+                        let newRecord = {
+                            id: Date.now() + Math.random(),
+                            itemCode: String(itemCode),
+                            itemType: String(itemType),
+                            supplier: String(supplier),
+                            ngDate: String(ngDate),
+                            ngQuantity: isNaN(ngQuantity) ? 1 : ngQuantity,
+                            ngError: String(ngError),
+                            status: String(status),
+                            confirmer: String(confirmer),
+                            note: String(note),
+                            images: []
+                        };
+
+                        records.unshift(newRecord);
+                        addedCount++;
+                    });
+
+                    saveToStorage();
+                    renderTable();
+                    alert(`Đã import thành công ${addedCount} bản ghi từ file Excel!`);
+                } catch (err) {
+                    console.error(err);
+                    alert('Lỗi khi đọc file Excel! Hãy đảm bảo bạn dùng đúng file mẫu.');
+                } finally {
+                    document.getElementById('excelFileInput').value = '';
+                }
+            };
+            reader.readAsArrayBuffer(file);
+        }
+
+        // Export Excel (Basic Table Data)
+        function exportToExcel() {
+            let dataToExport = records.map((r, idx) => ({
+                'STT': idx + 1,
+                'Mã hàng': r.itemCode,
+                'Loại hàng': r.itemType,
+                'Nhà cung cấp': r.supplier,
+                'Ngày phát sinh': r.ngDate,
+                'Số lượng NG': r.ngQuantity,
+                'Lỗi gặp phải': r.ngError,
+                'Hiện trạng': r.status,
+                'Người xác nhận': r.confirmer,
+                'Ghi chú': r.note,
+                'Số lượng ảnh đính kèm': r.images ? r.images.length : 0
+            }));
+
+            let worksheet = XLSX.utils.json_to_sheet(dataToExport);
+            let workbook = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(workbook, worksheet, "List NG Pending");
+            XLSX.writeFile(workbook, "List_NG_Pending.xlsx");
+        }
+
+        // Export HTML Report WITH IMAGES INCLUDED
+        function exportHTMLReport() {
+            let rowsHTML = '';
+            records.forEach((r, idx) => {
+                let imgsHtml = '';
+                if(r.images && r.images.length > 0) {
+                    r.images.forEach(img => {
+                        imgsHtml += `<img src="${img}" style="width: 80px; height: 80px; object-fit: contain; border: 1px solid #ddd; border-radius: 4px; margin: 2px; background: #fff;" />`;
+                    });
+                } else {
+                    imgsHtml = '<span style="color: #888; font-style: italic;">Không có ảnh</span>';
+                }
+
+                rowsHTML += `
+                    <tr>
+                        <td style="border: 1px solid #ddd; padding: 8px; text-align: center;">${idx + 1}</td>
+                        <td style="border: 1px solid #ddd; padding: 8px; font-weight: bold; color: #4f46e5;">${r.itemCode}</td>
+                        <td style="border: 1px solid #ddd; padding: 8px;">${r.itemType}</td>
+                        <td style="border: 1px solid #ddd; padding: 8px;">${r.supplier}</td>
+                        <td style="border: 1px solid #ddd; padding: 8px; text-align: center;">${r.ngDate}</td>
+                        <td style="border: 1px solid #ddd; padding: 8px; text-align: right; font-weight: bold; color: #dc2626;">${r.ngQuantity}</td>
+                        <td style="border: 1px solid #ddd; padding: 8px;">${r.ngError}</td>
+                        <td style="border: 1px solid #ddd; padding: 8px; text-align: center;"><b>${r.status}</b></td>
+                        <td style="border: 1px solid #ddd; padding: 8px;">${r.confirmer || '-'}</td>
+                        <td style="border: 1px solid #ddd; padding: 8px;">${r.note || '-'}</td>
+                        <td style="border: 1px solid #ddd; padding: 8px; text-align: center; white-space: nowrap;">${imgsHtml}</td>
+                    </tr>
+                `;
+            });
+
+            let fullHtml = `
+                <!DOCTYPE html>
+                <html lang="vi">
+                <head>
+                    <meta charset="UTF-8">
+                    <title>Báo Cáo List NG Pending Kèm Hình Ảnh</title>
+                    <style>
+                        body { font-family: Arial, sans-serif; margin: 20px; color: #333; }
+                        h2 { text-align: center; color: #dc2626; text-transform: uppercase; }
+                        p { text-align: center; font-size: 13px; color: #666; }
+                        table { width: 100%; border-collapse: collapse; margin-top: 20px; font-size: 13px; }
+                        th { background-color: #f3f4f6; border: 1px solid #ddd; padding: 10px; text-transform: uppercase; font-size: 11px; }
+                    </style>
+                </head>
+                <body>
+                    <h2>Báo Cáo Tổng Hợp Lỗi Chất Lượng (NG Pending)</h2>
+                    <p>Ngày xuất báo cáo: ${new Date().toLocaleString('vi-VN')}</p>
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>STT</th>
+                                <th>Mã hàng</th>
+                                <th>Loại hàng</th>
+                                <th>Nhà cung cấp</th>
+                                <th>Ngày</th>
+                                <th>SL NG</th>
+                                <th>Lỗi gặp phải</th>
+                                <th>Hiện trạng</th>
+                                <th>Người xác nhận</th>
+                                <th>Ghi chú</th>
+                                <th>Hình ảnh minh chứng</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${rowsHTML}
+                        </tbody>
+                    </table>
+                </body>
+                </html>
+            `;
+
+            let blob = new Blob([fullHtml], { type: 'text/html;charset=utf-8' });
+            let url = URL.createObjectURL(blob);
+            let a = document.createElement('a');
+            a.href = url;
+            a.download = `Bao_Cao_NG_Pending_${new Date().toISOString().slice(0,10)}.html`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        }
+    </script>
+</body>
+</html>
